@@ -50,96 +50,151 @@ void setup() {
   transmit(1, 1, def_B);
 
   Serial.begin(9600);
+  Serial.setTimeout(5);
   Serial.println("start_DAC");
 }
 
 
 void loop() {
-  if (Serial.readBytes(inBytes, 16) != 0) {
-    /*
-    // シリアルバッファが16バイトである場合にバッファを変数に格納
-    // [mode] [forward/velocity] [crosswise/radius] [delay]
-    // [0] [0 0000] [0 0000] [00000]
-    // [mode]
-    // 0 : 即時停止
-    // 1 : 電圧のシリアル値（相対値，スムージングなし）
-    // 2 : 電圧のシリアル値（相対値，スムージングあり）
-    // 3 : ルンバ式シリアル値
-    //
-    // [mode == 0]
-    // 続く15バイトを無視して電圧を標準値にする
-    // 滑らかに停止させる場合，[2 00000 00000 xxxxx]
-    //
-    // [mode == 1 || mode == 2] [forward] [crosswise]
-    // -4095 ~ 04095
-    // 基準電圧 + (-5.00 ~ 5.00) [V]
-    // ただし，結果が 0 ~ 4095 を逸脱しない
-    // 符号は0かそれ以外かで判別する
-    //
-    // [mode == 3] [velocity] [radius]
-    // -9999 ~ 09999
-    // 速度は[mm/s]，半径は[mm]
-    // ±5000を上限の目安にする
-    // 後ろ向きに走行する場合，速度が負のとき進行方向，半径が負のとき進行方向左回り
-    // 符号は0かそれ以外かで判別する
-    //
-    // [delay]
-    // 00000 ~ 99999
-    // 受信したシリアル値を出力してからdelay[ms]維持する
-    // その後，新しい指令値がない場合は停止
-    // 割り込む場合は[mode == 0]で停止させてから新しいデータを送信する
-    */
-    //a = inBytes;
-    /*　// ↓このへんを要検討
-    char mode_char = inByte.substring(0, 1);
-    char fwd_char = inByte.substring(2, 6);
-    char crs_char = inByte.substring(7, 11);
-    char delay_char = inByte.substring(11);
-
-    mode_val = atoi(mode_char);
-    fwd_val = atoi(fwd_char);
-    crs_val = atoi(crs_char);
-    delay_val = atoi(delay_char);
-
-    if (getBytes(inBytes, 1, 1) != 0) fwd_val = -fwd_val;
-    if (getBytes(inBytes, 1, 6) != 0) fwd_val = -fwd_val;
-
-    Serial.println(1);
-
-    transmit(mode_val, fwd_val, crs_val);
-*/
+  /*
+  // シリアルバッファが16バイトである場合にバッファを変数に格納
+  // [mode] [forward/velocity] [crosswise/radius] [delay]
+  // [0] [0 0000] [0 0000] [00000]
+  // [mode]
+  // 0 : 即時停止
+  // 1 : 電圧のシリアル値（相対値，スムージングなし）
+  // 2 : 電圧のシリアル値（相対値，スムージングあり）
+  // 3 : ルンバ式シリアル値
+  //
+  // [mode == 0]
+  // 続く15バイトを無視して電圧を標準値にする
+  // 滑らかに停止させる場合，[2 00000 00000 xxxxx]
+  //
+  // [mode == 1 || mode == 2] [forward] [crosswise]
+  // -4095 ~ 04095
+  // 基準電圧 + (-5.00 ~ 5.00) [V]
+  // ただし，結果が 0 ~ 4095 を逸脱しない
+  // 符号は0かそれ以外かで判別する
+  //
+  // [mode == 3] [velocity] [radius]
+  // -9999 ~ 09999
+  // 速度は[mm/s]，半径は[mm]
+  // ±5000を上限の目安にする
+  // 後ろ向きに走行する場合，速度が負のとき進行方向，半径が負のとき進行方向左回り
+  // 符号は0かそれ以外かで判別する
+  //
+  // [delay]
+  // 00000 ~ 99999
+  // 受信したシリアル値を出力してからdelay[ms]維持する
+  // その後，新しい指令値がない場合は停止
+  // 割り込む場合は[mode == 0]で停止させてから新しいデータを送信する
+  */
+  char str[40] = {0};
+  while (Serial.available() > 0) {
+    if (Serial.read() == 'j') {
+      if (Serial.readBytesUntil('x', str, 40) == 16) {
+        // jの次から文字列の終端かxの直前までが16字の場合
+        convert(str);
+      }
+    }
   }
-  else { // シリアル値がある場合は送信しない
-    if (digitalRead(3) != digitalRead(6)) {
-      if (digitalRead(3) == LOW)  transmit(2, 0, lft);
-      if (digitalRead(6) == LOW)  transmit(2, 0, rgt);
-    } else {
-      transmit(2, 0, def_A);
-    }
-    if (digitalRead(4) != digitalRead(5)) {
-      if (digitalRead(4) == LOW)  transmit(2, 1, fwd);
-      if (digitalRead(5) == LOW)  transmit(2, 1, bck);
-    } else {
-      transmit(2, 1, def_B);
-    }
+  
+  if (digitalRead(3) != digitalRead(6)) {
+    if (digitalRead(3) == LOW)  transmit(2, 0, lft);
+    if (digitalRead(6) == LOW)  transmit(2, 0, rgt);
+  } else {
+    transmit(2, 0, def_A);
+  }
+  if (digitalRead(4) != digitalRead(5)) {
+    if (digitalRead(4) == LOW)  transmit(2, 1, fwd);
+    if (digitalRead(5) == LOW)  transmit(2, 1, bck);
+  } else {
+    transmit(2, 1, def_B);
   }
 }
 
+
+void convert(char *str) {
+  // j8012340678955555x
+  // j1143211987600000x
+  // j0000000000010000x
+  char mode[2];
+  char velo[5];
+  char cros[5];
+  char dely[6];
+
+  mode[0] = str[0];
+  mode[1] = '\0';
+
+  velo[0] = str[2];
+  velo[1] = str[3];
+  velo[2] = str[4];
+  velo[3] = str[5];
+  velo[4] = '\0';
+
+  cros[0] = str[7];
+  cros[1] = str[8];
+  cros[2] = str[9];
+  cros[3] = str[10];
+  cros[4] = '\0';
+
+  dely[0] = str[11];
+  dely[1] = str[12];
+  dely[2] = str[13];
+  dely[3] = str[14];
+  dely[4] = str[15];
+  dely[5] = '\0';
+
+  int mode_num;
+  int velo_num;
+  int cros_num;
+  long dely_num;
+  
+  int velo_pm = 1;
+  int cros_pm = 1;
+
+  if (str[1] != '0') velo_pm = -1;
+  if (str[6] != '0') cros_pm = -1;
+
+  mode_num = atoi(mode);
+  velo_num = velo_pm * atoi(velo);
+  cros_num = cros_pm * atoi(cros);
+  dely_num = atol(dely); 
+
+  Serial.println(str);
+//  Serial.println(mode);
+//  Serial.println(mode_num);
+//  Serial.println(velo);
+//  Serial.println(velo_num);
+//  Serial.println(cros);
+//  Serial.println(cros_num);
+//  Serial.println(dely);
+//  Serial.println(dely_num);
+  
+  int escape_time = millis() + dely_num;
+
+  while ( (escape_time > millis() ) && (Serial.available() <= 0) ) {
+    transmit(mode_num, velo_num, cros_num);
+  }
+}
+
+
 void transmit(int mode, int ch, int DA_value) {
-  int tmp_val;
   /*
   // mode
   // 0: 即時停止
   // 1: スムージングなし
   // 2: スムージングあり
   // 3: ルンバ的動作（開発中）
-  // 
+  //
   // ch 0:A(ヨコ) 1:B(タテ)
   // 基準値から±0.6Vは反応しないので，反応速度を高めるため
   // シリアル値で450だけ飛ばす
   // スムージングする場合，ヨコは30ずつ，タテは20ずつ加減算
   // tmp_A, tmp_Bはグローバル変数で現在のシリアル値を保持
   */
+  int tmp_val;
+
   switch (mode) {
     case 0:// 即時停止
       spi_transmit(0, def_A);
@@ -213,6 +268,7 @@ void transmit(int mode, int ch, int DA_value) {
       break;
   }
 }
+
 
 void spi_transmit(int ch, int tmp) {
   SPI.begin() ;
