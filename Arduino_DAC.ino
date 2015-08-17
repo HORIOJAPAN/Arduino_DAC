@@ -15,22 +15,23 @@ int bck = 500;
 int rgt = 200;
 int lft = 3900;
 
-char *inBytes;
-
 
 void setup() {
+  // 物理ボタンピン
   pinMode(3, INPUT_PULLUP );
   pinMode(4, INPUT_PULLUP );
   pinMode(5, INPUT_PULLUP );
   pinMode(6, INPUT_PULLUP );
 
-  // 制御するピンは全て出力に設定する
+  // ラッチ動作出力ピン
   pinMode(LDAC, OUTPUT) ;
-  // SPIの初期化処理を行う
+
+  // SPIの初期化
   SPI.setBitOrder(MSBFIRST) ;          // ビットオーダー
   SPI.setClockDivider(SPI_CLOCK_DIV8) ;// クロック(CLK)をシステムクロックの1/8で使用(16MHz/8)
   SPI.setDataMode(SPI_MODE0) ;         // クロック極性０(LOW)　クロック位相０
 
+  // 基準電圧の取得（入力は10bit，出力は12bit）
   A0_val = 0;
   A0_val += analogRead(A0);
   delay(1);
@@ -40,15 +41,18 @@ void setup() {
   delay(1);
   A0_val += analogRead(A0);
 
+  // 出力目標値の設定
   def_A = def_B = A0_val;
   fwd = def_B + 1300;
   bck = def_B - 1500;
   rgt = def_A - 1500;
   lft = def_A + 1500;
 
+  // スムージングなしでデフォルト値の出力
   transmit(1, 0, def_A);
   transmit(1, 1, def_B);
 
+  // シリアル通信のタイムアウトを5msに（デフォルトは1000ms）
   Serial.begin(9600);
   Serial.setTimeout(5);
   Serial.println("start_DAC");
@@ -93,12 +97,14 @@ void loop() {
   while (Serial.available() > 0) {
     if (Serial.read() == 'j') {
       if (Serial.readBytesUntil('x', str, 40) == 16) {
-        // jの次から文字列の終端かxの直前までが16字の場合
         convert(str);
+        // バッファがあるとき'j'が検出できるまで読み取り
+        // jの次から文字列の終端かxの直前までが16字の場合のみ動作
       }
     }
   }
-  
+
+  // シリアル通信がないとき，物理ボタンの状態を参照
   if (digitalRead(3) != digitalRead(6)) {
     if (digitalRead(3) == LOW)  transmit(2, 0, lft);
     if (digitalRead(6) == LOW)  transmit(2, 0, rgt);
@@ -115,9 +121,14 @@ void loop() {
 
 
 void convert(char *str) {
+  /*
+  // 取得した文字列の内，データ部分を数値に変換する
+  // 数値化した指令値をそのままSPIに指示する
+  // 待機継続時間は5桁なのでlong型
   // j8012340678955555x
   // j1143211987600000x
   // j0000000000010000x
+  */
   char mode[2];
   char velo[5];
   char cros[5];
@@ -149,7 +160,7 @@ void convert(char *str) {
   int velo_num;
   int cros_num;
   long dely_num;
-  
+
   int velo_pm = 1;
   int cros_pm = 1;
 
@@ -159,18 +170,18 @@ void convert(char *str) {
   mode_num = atoi(mode);
   velo_num = velo_pm * atoi(velo);
   cros_num = cros_pm * atoi(cros);
-  dely_num = atol(dely); 
+  dely_num = atol(dely);
 
   Serial.println(str);
-//  Serial.println(mode);
-//  Serial.println(mode_num);
-//  Serial.println(velo);
-//  Serial.println(velo_num);
-//  Serial.println(cros);
-//  Serial.println(cros_num);
-//  Serial.println(dely);
-//  Serial.println(dely_num);
-  
+  //  Serial.println(mode);
+  //  Serial.println(mode_num);
+  //  Serial.println(velo);
+  //  Serial.println(velo_num);
+  //  Serial.println(cros);
+  //  Serial.println(cros_num);
+  //  Serial.println(dely);
+  //  Serial.println(dely_num);
+
   int escape_time = millis() + dely_num;
 
   while ( (escape_time > millis() ) && (Serial.available() <= 0) ) {
@@ -196,20 +207,23 @@ void transmit(int mode, int ch, int DA_value) {
   int tmp_val;
 
   switch (mode) {
-    case 0:// 即時停止
+    case 0:
+      // 即時停止
       spi_transmit(0, def_A);
       spi_transmit(1, def_B);
       tmp_A = def_A;
       tmp_B = def_B;
       break;
 
-    case 1:// スムージングなし
+    case 1:
+      // スムージングなし
       if (ch == 0) tmp_A = DA_value;
       else if (ch == 1) tmp_B = DA_value;
       spi_transmit(ch, DA_value);
       break;
 
-    case 2:// スムージングあり
+    case 2:
+      // スムージングあり
       if ((ch == 0) && (tmp_A != DA_value)) {
         if (tmp_A == def_A) {
           if (tmp_A < DA_value) tmp_A += 450;
