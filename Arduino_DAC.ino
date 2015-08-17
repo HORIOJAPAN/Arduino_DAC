@@ -184,7 +184,7 @@ void convert(char *str) {
 
   int escape_time = millis() + dely_num;
 
-  while ( (escape_time > millis() ) && (Serial.available() <= 0) ) {
+  do while ( (escape_time > millis() ) && (Serial.available() <= 0) ) {
     transmit(mode_num, velo_num, cros_num);
   }
 }
