@@ -1,8 +1,12 @@
 
 #include "pins_arduino.h"
+#define spi
 #include <SPI.h>
 
 #define LDAC   12              // ラッチ動作出力ピン
+
+#include "Arduino_DAC.h"
+
 
 int A0_val = 0;
 int def_A = 2047;
@@ -15,6 +19,9 @@ int bck = 500;
 int rgt = 200;
 int lft = 3900;
 
+// Jcodeクラス 現在の値，待機している値
+Jcode current;
+Jcode queue;
 
 void setup() {
   // 物理ボタンピン
@@ -97,7 +104,8 @@ void loop() {
   while (Serial.available() > 0) {
     if (Serial.read() == 'j') {
       if (Serial.readBytesUntil('x', str, 40) == 16) {
-        convert(str);
+        current.set(str);
+        current.show_raw();
         // バッファがあるとき'j'が検出できるまで読み取り
         // jの次から文字列の終端かxの直前までが16字の場合のみ動作
       }
@@ -189,126 +197,11 @@ void convert(char *str) {
 
   long escape_time = millis() + dely_num;
 
-  do{
+  do {
     transmit(mode_num, 0, def_A + cros_num);
     transmit(mode_num, 1, def_B + velo_num);
   } while ( (escape_time > millis() ) && (Serial.available() <= 0) ) ;
   Serial.println("exit");
 }
 
-
-void transmit(int mode, int ch, int DA_value) {
-  /*
-  // mode
-  // 0: 即時停止
-  // 1: スムージングなし
-  // 2: スムージングあり
-  // 3: ルンバ的動作（開発中）
-  //
-  // ch 0:A(ヨコ) 1:B(タテ)
-  // 基準値から±0.6Vは反応しないので，反応速度を高めるため
-  // シリアル値で450だけ飛ばす
-  // スムージングする場合，ヨコは30ずつ，タテは20ずつ加減算
-  // tmp_A, tmp_Bはグローバル変数で現在のシリアル値を保持
-  */
-  int tmp_val;
-
-  switch (mode) {
-    case 0:
-      // 即時停止
-      spi_transmit(0, def_A);
-      spi_transmit(1, def_B);
-      tmp_A = def_A;
-      tmp_B = def_B;
-      break;
-
-    case 1:
-      // スムージングなし
-      if (ch == 0) tmp_A = DA_value;
-      else if (ch == 1) tmp_B = DA_value;
-      spi_transmit(ch, DA_value);
-      break;
-
-    case 2:
-      // スムージングあり
-      if ((ch == 0) && (tmp_A != DA_value)) {
-        if (tmp_A == def_A) {
-          if (tmp_A < DA_value) tmp_A += 450;
-          else if (tmp_A > DA_value) tmp_A -= 450;
-        }
-        if (abs(tmp_A - DA_value) < 60) tmp_A = DA_value;
-        else if (tmp_A < DA_value) tmp_A += 30;
-        else if (tmp_A > DA_value) tmp_A -= 30;
-      } else if ((ch == 1) && (tmp_B != DA_value)) {
-        if (tmp_B == def_B) {
-          if (tmp_B < DA_value) tmp_B += 450;
-          else if (tmp_B > DA_value) tmp_B -= 450;
-        }
-        if (abs(tmp_B - DA_value) < 40) tmp_B = DA_value;
-        else if (tmp_B < DA_value) tmp_B += 20;
-        else if (tmp_B > DA_value) tmp_B -= 20;
-      }
-      if (ch == 0)  spi_transmit(0, tmp_A);
-      else if (ch == 1)  spi_transmit(1, tmp_B);
-      break;
-
-    case 3:
-      /*
-      // ルンバ的動作をエミュレートする関数
-      // 速度値を(-500 - 500 mm/s)で指定
-      // 半径値を(-2000 - 2000 mm)で指定
-      // 半径値が 0 のとき，直進・後進
-      // 半径値が -1 のとき，時計周りにその場で回転
-      // 半径値が 1 のとき，反時計回りにその場で回転
-      // 半径値が負のとき，右を回転中心として回転
-      // 半径値が正のとき，左を回転中心として回転
-      */
-
-      int velocity = ch;
-      int radius = DA_value;
-      int DA_vA = def_A;
-      int DA_vB = def_B;
-
-      if (radius == 0) {
-        DA_vB = def_B + velocity / 10 * 10;
-        spi_transmit(0, def_A);
-        spi_transmit(1, DA_vB);
-      } else if (radius == -1) {
-        DA_vA = def_A - velocity / 10 * 10; // 角速度右回り
-        spi_transmit(0, DA_vA);
-        spi_transmit(1, def_B);
-      } else if (radius == 1) {
-        DA_vA = def_A + velocity / 10 * 10; // 角速度左回り
-        spi_transmit(0, DA_vA);
-        spi_transmit(1, def_B);
-      } else if (abs(radius) < 250) { // 角速度
-        while (0);
-      } else { // 速度
-        while (0);
-      }
-      break;
-  }
-}
-
-
-void spi_transmit(int ch, int tmp) {
-  SPI.begin() ;
-  if (ch == 0) {
-    digitalWrite(LDAC, HIGH) ;
-    digitalWrite(SS, LOW) ;
-    SPI.transfer(0b01110000 | (0b00001111 & highByte(tmp)));
-    SPI.transfer(lowByte(tmp));
-    digitalWrite(SS, HIGH) ;
-    digitalWrite(LDAC, LOW) ;       // ラッチ信号を出す
-  } else if (ch == 1) {
-    digitalWrite(LDAC, HIGH) ;
-    digitalWrite(SS, LOW) ;
-    SPI.transfer(0b11110000 | (0b00001111 & highByte(tmp)));
-    SPI.transfer(lowByte(tmp));
-    digitalWrite(SS, HIGH) ;
-    digitalWrite(LDAC, LOW) ;       // ラッチ信号を出す
-  }
-  SPI.end() ;
-  delay(5);
-}
 
