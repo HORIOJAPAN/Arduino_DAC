@@ -127,6 +127,11 @@ void convert(char *str) {
   // 待機継続時間は5桁なのでlong型
   // j8012340678955555x
   // j1143211987600000x
+  //
+  // j0000000000010000x
+  // j1010000100010000x
+  // j1110001100010000x
+  // j2020000000010000x
   // j0000000000010000x
   */
   char mode[2];
@@ -174,12 +179,10 @@ void convert(char *str) {
 
   Serial.println(str);
   //  Serial.println(mode);
-  //  Serial.println(mode_num);
   //  Serial.println(velo);
-  //  Serial.println(velo_num);
   //  Serial.println(cros);
-  //  Serial.println(cros_num);
   //  Serial.println(dely);
+<<<<<<< HEAD
   //  Serial.println(dely_num);
 
   int escape_time = millis() + dely_num;
@@ -187,6 +190,20 @@ void convert(char *str) {
   while ( (escape_time > millis() ) && (Serial.available() <= 0) ) {
     transmit(mode_num, velo_num, cros_num);
   }
+=======
+  Serial.println(mode_num);
+  Serial.println(velo_num);
+  Serial.println(cros_num);
+  Serial.println(dely_num);
+
+  long escape_time = millis() + dely_num;
+
+  do{
+    transmit(mode_num, 0, def_A + cros_num);
+    transmit(mode_num, 1, def_B + velo_num);
+  } while ( (escape_time > millis() ) && (Serial.available() <= 0) ) ;
+  Serial.println("exit");
+>>>>>>> origin/master
 }
 
 
