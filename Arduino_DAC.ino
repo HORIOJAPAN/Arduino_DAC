@@ -20,8 +20,8 @@ int rgt = 200;
 int lft = 3900;
 
 // Jcodeクラス 現在の値，待機している値
-Jcode current;
-Jcode queue;
+Jcode Current;
+Jcode Queue;
 
 void setup() {
   // 物理ボタンピン
@@ -104,8 +104,10 @@ void loop() {
   while (Serial.available() > 0) {
     if (Serial.read() == 'j') {
       if (Serial.readBytesUntil('x', str, 40) == 16) {
-        current.set(str);
-        current.show_raw();
+        Current.set(str);
+        Current.show_raw();
+        Current.convert();
+        Current.echo();
         // バッファがあるとき'j'が検出できるまで読み取り
         // jの次から文字列の終端かxの直前までが16字の場合のみ動作
       }

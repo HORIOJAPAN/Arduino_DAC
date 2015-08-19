@@ -12,6 +12,9 @@ extern int def_B;
 extern int tmp_A;
 extern int tmp_B;
 
+extern Jcode Current;
+extern Jcode Queue;
+
 /*=== class Jcode begin ===*/
 class Jcode {
     char raw_code[40];
@@ -21,7 +24,6 @@ class Jcode {
     char cros[5];
     char dely[6];
 
-    int mode_num;
     int velo_num;
     int cros_num;
     long dely_num;
@@ -31,11 +33,11 @@ class Jcode {
     int cros_pm = 1;
 
   public:
-    bool valid = false;
-    // queueが有効な場合true
+    int mode_num;    // 0の参照のためpublic
+    bool valid = false;    // queueが有効な場合true
 
     Jcode() ;
-    
+
     void set(char raw[40]);
 
     void convert();
@@ -104,12 +106,38 @@ void Jcode::show_num() {
   Serial.println(dely_num);
 }
 
+extern char str;
+
 void Jcode::echo() {
   escape_time = millis() + dely_num;
-  do {
+  transmit(mode_num, 0, def_A + cros_num);
+  transmit(mode_num, 1, def_B + velo_num);
+  while (1) {
+    if (escape_time <= millis()) { // 維持時間を超過した
+      if (Queue.valid == true) { // 待機データが有効である
+        // Queue を Current に代入
+        // Queue をクリア
+      } else {
+        return 0;
+      }
+    }
+    while (Serial.available() > 0) {
+      if (Serial.read() == 'j') {
+        if (Serial.readBytesUntil('x', str, 40) == 16) {
+          Queue.set(str);
+          Queue.convert();
+          if (Queue.mode_num == 0) {
+            transmit(0, 0, 0);
+            // Current,Queueクリア
+            return 0;
+          }
+          Queue.valid = true;
+        }
+      }
+    }
     transmit(mode_num, 0, def_A + cros_num);
     transmit(mode_num, 1, def_B + velo_num);
-  } while ( (escape_time > millis() ) && (Serial.available() <= 0) ) ;
+  }
   Serial.println("exit");
 }
 /*=== class Jcode end ===*/
