@@ -7,6 +7,39 @@
 
 #include "Arduino_DAC.h"
 
+  /*
+  // シリアルバッファが16バイトである場合にバッファを変数に格納
+  // [mode] [forward/velocity] [crosswise/radius] [delay]
+  // [0] [0 0000] [0 0000] [00000]
+  // [mode]
+  // 0 : 即時停止
+  // 1 : 電圧のシリアル値（相対値，スムージングなし）
+  // 2 : 電圧のシリアル値（相対値，スムージングあり）
+  // 3 : ルンバ式シリアル値
+  //
+  // [mode == 0]
+  // 続く15バイトを無視して電圧を標準値にする
+  // 滑らかに停止させる場合，[2 00000 00000 xxxxx]
+  //
+  // [mode == 1 || mode == 2] [forward] [crosswise]
+  // -4095 ~ 04095
+  // 基準電圧 + (-5.00 ~ 5.00) [V]
+  // ただし，結果が 0 ~ 4095 を逸脱しない
+  // 符号は0かそれ以外かで判別する
+  //
+  // [mode == 3] [velocity] [radius]
+  // -9999 ~ 09999
+  // 速度は[mm/s]，半径は[mm]
+  // ±5000を上限の目安にする
+  // 後ろ向きに走行する場合，速度が負のとき進行方向，半径が負のとき進行方向左回り
+  // 符号は0かそれ以外かで判別する
+  //
+  // [delay]
+  // 00000 ~ 99999
+  // 受信したシリアル値を出力してからdelay[ms]維持する
+  // その後，新しい指令値がない場合は停止
+  // 割り込む場合は[mode == 0]で停止させてから新しいデータを送信する
+  */
 
 int A0_val = 0;
 int def_A = 2047;
@@ -55,8 +88,8 @@ void setup() {
   lft = def_A + 1500;
 
   // スムージングなしでデフォルト値の出力
-  transmit(1, 0, def_A);
-  transmit(1, 1, def_B);
+  transmit(1, 0, def_A, 0);
+  transmit(1, 1, def_B, 0);
 
   // シリアル通信のタイムアウトを5msに（デフォルトは1000ms）
   Serial.begin(9600);
@@ -66,39 +99,6 @@ void setup() {
 
 
 void loop() {
-  /*
-  // シリアルバッファが16バイトである場合にバッファを変数に格納
-  // [mode] [forward/velocity] [crosswise/radius] [delay]
-  // [0] [0 0000] [0 0000] [00000]
-  // [mode]
-  // 0 : 即時停止
-  // 1 : 電圧のシリアル値（相対値，スムージングなし）
-  // 2 : 電圧のシリアル値（相対値，スムージングあり）
-  // 3 : ルンバ式シリアル値
-  //
-  // [mode == 0]
-  // 続く15バイトを無視して電圧を標準値にする
-  // 滑らかに停止させる場合，[2 00000 00000 xxxxx]
-  //
-  // [mode == 1 || mode == 2] [forward] [crosswise]
-  // -4095 ~ 04095
-  // 基準電圧 + (-5.00 ~ 5.00) [V]
-  // ただし，結果が 0 ~ 4095 を逸脱しない
-  // 符号は0かそれ以外かで判別する
-  //
-  // [mode == 3] [velocity] [radius]
-  // -9999 ~ 09999
-  // 速度は[mm/s]，半径は[mm]
-  // ±5000を上限の目安にする
-  // 後ろ向きに走行する場合，速度が負のとき進行方向，半径が負のとき進行方向左回り
-  // 符号は0かそれ以外かで判別する
-  //
-  // [delay]
-  // 00000 ~ 99999
-  // 受信したシリアル値を出力してからdelay[ms]維持する
-  // その後，新しい指令値がない場合は停止
-  // 割り込む場合は[mode == 0]で停止させてから新しいデータを送信する
-  */
   while (JoystickData.check() == true){
     JoystickData.show_raw();
     JoystickData.convert();
@@ -106,21 +106,21 @@ void loop() {
     JoystickData.echo();
   }
 
-  Serial.println("looping");
-  delay(100);
+  //Serial.println("looping");
+  //delay(1000);
 
   // シリアル通信がないとき，物理ボタンの状態を参照
   if (digitalRead(3) != digitalRead(6)) {
-    if (digitalRead(3) == LOW)  transmit(2, 0, lft);
-    if (digitalRead(6) == LOW)  transmit(2, 0, rgt);
+    if (digitalRead(3) == LOW)  transmit(2, 0, lft, 0);
+    if (digitalRead(6) == LOW)  transmit(2, 0, rgt, 0);
   } else {
-    transmit(2, 0, def_A);
+    transmit(2, 0, def_A, 0);
   }
   if (digitalRead(4) != digitalRead(5)) {
-    if (digitalRead(4) == LOW)  transmit(2, 1, fwd);
-    if (digitalRead(5) == LOW)  transmit(2, 1, bck);
+    if (digitalRead(4) == LOW)  transmit(2, 1, fwd, 0);
+    if (digitalRead(5) == LOW)  transmit(2, 1, bck, 0);
   } else {
-    transmit(2, 1, def_B);
+    transmit(2, 1, def_B, 0);
   }
 }
 

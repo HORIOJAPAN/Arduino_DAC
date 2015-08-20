@@ -4,7 +4,7 @@
 #include <SPI.h>
 #endif
 
-void transmit(int mode, int ch, int DA_value);
+void transmit(int mode, int value1, int value2, int value3);
 void spi_transmit(int ch, int tmp);
 
 extern int def_A;
@@ -17,17 +17,17 @@ extern int tmp_B;
 class Jcode {
     char receive_raw[40];
 
-    long escape_time;
+    long escape_time;           // millis()と比較するための変数
 
     char mode[2];
     char value1[5];
     char value2[5];
-    char value3[6];
+    char value3[6];             // 分割した文字列を格納
 
     int mode_num;
     int value1_num;
     int value2_num;
-    long value3_num;
+    long value3_num;            // 数値化して格納
 
   public:
     int receive_mode;           // 待機のモードは外部参照可能
@@ -35,12 +35,12 @@ class Jcode {
 
     Jcode() ;
 
-    bool check();
-    void convert();
+    bool check();       // シリアルバッファのチェック，文字列格納，即時停止チェック
+    void convert();     // 格納された文字列の数値化
     void show_raw();
     void show_div();
-    void show_num();
-    void echo();
+    void show_num();    // データのシリアル送信
+    void echo();        // 維持時間の間，繰り返し処理
 };
 
 Jcode::Jcode() {
@@ -66,7 +66,7 @@ bool Jcode::check() {
         receive_raw[16] = '\0';
 
         if (receive_raw[0] == '0') {
-          transmit(0, 0, 0);
+          transmit(0, 0, 0, 0);
           Serial.println("stop");
           escape_time = 0;
           return false;
@@ -106,7 +106,7 @@ void Jcode::convert() {
   value3[5] = '\0';
 
   mode_num = atoi(mode);
-  // {A ? B : C} => Aが trueならB, falseならC （三項演算子）
+  // X = {A ? B : C} => Aが trueならB, falseならC （三項演算子）
   value1_num = (receive_raw[1] == '0') ? atoi(value1) : -atoi(value1);
   value2_num = (receive_raw[6] == '0') ? atoi(value2) : -atoi(value2);
   value3_num = atol(value3);
@@ -134,23 +134,23 @@ void Jcode::show_num() {
 
 void Jcode::echo() {
   escape_time = millis() + value3_num;
-  transmit(mode_num, 0, def_A + value2_num);
-  transmit(mode_num, 1, def_B + value1_num);
+  transmit(mode_num, 0, def_A + value2_num, 0);
+  transmit(mode_num, 1, def_B + value1_num, 0);
   while (1) {
     if (escape_time <= millis()) { // 維持時間を超過した
       if (receive_valid == true) { // 待機データが有効である
-        show_raw();
         convert();   // 待機データを数値に変換，データの無効化
-        show_num();
-        transmit(mode_num, 0, def_A + value2_num);
-        transmit(mode_num, 1, def_B + value1_num);
         Serial.println("convert");
+        show_num();
+        escape_time = millis() + value3_num;
+        transmit(mode_num, 0, def_A + value2_num, 0);
+        transmit(mode_num, 1, def_B + value1_num, 0);
       } else {       // データが無効なら関数離脱
         Serial.println("exit");
         return;
       }
-      //transmit(mode_num, 0, def_A + value2_num);
-      //transmit(mode_num, 1, def_B + value1_num);
+      //transmit(mode_num, 0, def_A + value2_num, 0);
+      //transmit(mode_num, 1, def_B + value1_num, 0);
     }
     check();
   }
@@ -159,21 +159,23 @@ void Jcode::echo() {
 
 
 
-void transmit(int mode, int ch, int DA_value) {
+
+
+void transmit(int mode, int value1, int value2, int value3) {
   /*
   // mode
   // 0: 即時停止
   // 1: スムージングなし
   // 2: スムージングあり
   // 3: ルンバ的動作（開発中）
+  // 4: 相対移動
   //
-  // ch 0:A(ヨコ) 1:B(タテ)
+  // ch(value1) 0:A(ヨコ) 1:B(タテ)
   // 基準値から±0.6Vは反応しないので，反応速度を高めるため
   // シリアル値で450だけ飛ばす
   // スムージングする場合，ヨコは30ずつ，タテは20ずつ加減算
   // tmp_A, tmp_Bはグローバル変数で現在のシリアル値を保持
   */
-  int tmp_val;
 
   switch (mode) {
     case 0:
@@ -186,32 +188,32 @@ void transmit(int mode, int ch, int DA_value) {
 
     case 1:
       // スムージングなし
-      if (ch == 0) tmp_A = DA_value;
-      else if (ch == 1) tmp_B = DA_value;
-      spi_transmit(ch, DA_value);
+      spi_transmit(value1, value2);
+      if (value1 == 0) tmp_A = value2;
+      if (value1 == 1) tmp_B = value2;
       break;
 
     case 2:
       // スムージングあり
-      if ((ch == 0) && (tmp_A != DA_value)) {
+      if ((value1 == 0) && (tmp_A != value2)) {
         if (tmp_A == def_A) {
-          if (tmp_A < DA_value) tmp_A += 450;
-          else if (tmp_A > DA_value) tmp_A -= 450;
+          if (tmp_A < value2) tmp_A += 450;
+          else if (tmp_A > value2) tmp_A -= 450;
         }
-        if (abs(tmp_A - DA_value) < 60) tmp_A = DA_value;
-        else if (tmp_A < DA_value) tmp_A += 30;
-        else if (tmp_A > DA_value) tmp_A -= 30;
-      } else if ((ch == 1) && (tmp_B != DA_value)) {
+        if (abs(tmp_A - value2) < 60) tmp_A = value2;
+        else if (tmp_A < value2) tmp_A += 30;
+        else if (tmp_A > value2) tmp_A -= 30;
+      } else if ((value1 == 1) && (tmp_B != value2)) {
         if (tmp_B == def_B) {
-          if (tmp_B < DA_value) tmp_B += 450;
-          else if (tmp_B > DA_value) tmp_B -= 450;
+          if (tmp_B < value2) tmp_B += 450;
+          else if (tmp_B > value2) tmp_B -= 450;
         }
-        if (abs(tmp_B - DA_value) < 40) tmp_B = DA_value;
-        else if (tmp_B < DA_value) tmp_B += 20;
-        else if (tmp_B > DA_value) tmp_B -= 20;
+        if (abs(tmp_B - value2) < 40) tmp_B = value2;
+        else if (tmp_B < value2) tmp_B += 20;
+        else if (tmp_B > value2) tmp_B -= 20;
       }
-      if (ch == 0)  spi_transmit(0, tmp_A);
-      else if (ch == 1)  spi_transmit(1, tmp_B);
+      if (value1 == 0)  spi_transmit(0, tmp_A);
+      else if (value1 == 1)  spi_transmit(1, tmp_B);
       break;
 
     case 3:
@@ -226,8 +228,8 @@ void transmit(int mode, int ch, int DA_value) {
       // 半径値が正のとき，左を回転中心として回転
       */
 
-      int velocity = ch;
-      int radius = DA_value;
+      int velocity = value1;
+      int radius = value2;
       int DA_vA = def_A;
       int DA_vB = def_B;
 
@@ -249,6 +251,60 @@ void transmit(int mode, int ch, int DA_value) {
         while (0);
       }
       break;
+
+    case 4:
+      /*
+       * ルンバ関数と同様であるが，速度ではなく距離を指定する
+       * 到達予想時間をシリアル通信で返す
+      */
+      break;
+
+    case 5:
+      /*
+      // 現在地と目的地でのその場回転，直進により移動を実現する
+      // 
+      // 現在地から目的地までの相対値で指令する
+      // 目的地の相対方位
+      // 目的地までの距離
+      // 目的地での自己の方位姿勢（移動方位からの相対値）
+      // の3つの値を指示し，到達予定時間をシリアル通信で返す
+      // 方位は0.1[deg]刻みで受け付ける（精度を保証するものではない）
+      // 直進を0とし，左回りに3600までの値を受け付ける
+      // 移動距離の制限はルンバ関数に準ずる
+      // 割り込みでの急停止に対応する
+      */
+
+      /*
+       * 目的地の方向を向く
+       * 直進移動する
+       * 目的地で姿勢を調整する
+       *
+       * ルンバ動作の再帰呼び出しによって実現
+       * 即時停止以外のシリアル通信データは移動終了後に連続処理
+       *
+      */;
+      break;
+      
+    case 6:
+      /*
+       * 直線移動，途中でのその場回転によって実現する
+       * 自己方位姿勢と目的地での方位姿勢を元に
+       * 接線の交点を計算し，交点で回転する
+       * 90[deg]を越えた値はcase5を再帰呼び出しする
+       * 2つの角度の正負が異なる場合，case5を再帰呼び出しする
+      */;
+      break;
+      
+    case 7:
+      /*
+       * 直線移動，円弧移動によって実現する
+       * 自己方位姿勢と目的地での方位姿勢を元に
+       * 半径2000[mm]以内の円弧と直線を組み合わせた経路を計算する
+       * 停止しない滑らかな移動が可能
+      */;
+      break;
+
+      
   }
 }
 
