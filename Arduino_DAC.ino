@@ -104,7 +104,10 @@ void loop() {
     JoystickData.convert();
     JoystickData.show_num();
     JoystickData.echo();
-  };
+  }
+
+  Serial.println("looping");
+  delay(100);
 
   // シリアル通信がないとき，物理ボタンの状態を参照
   if (digitalRead(3) != digitalRead(6)) {

@@ -29,9 +29,6 @@ class Jcode {
     int value2_num;
     long value3_num;
 
-    //    int value1_pm = 1;
-    //    int value2_pm = 1;
-
   public:
     int receive_mode;           // 待機のモードは外部参照可能
     bool receive_valid = false; // 待機が有効な場合true
@@ -58,6 +55,7 @@ bool Jcode::check() {
   // それ以外の時receive_valid = true
   // 受信データが有効な場合，関数としてtrueを返しSPIの送信処理に入る
   */
+  bool answer = false;
   while (Serial.available() > 0) {
     if (Serial.read() == 'j') {
       char str[40];
@@ -66,19 +64,22 @@ bool Jcode::check() {
           receive_raw[i] = str[i];
         }
         receive_raw[16] = '\0';
-        
+
         if (receive_raw[0] == '0') {
           transmit(0, 0, 0);
-          Serial.print("stop");
+          Serial.println("stop");
+          escape_time = 0;
           return false;
           // 待機データのmodeが0のとき即時停止して関数離脱
         }
         receive_valid = true;
-        return true;
+        Serial.println("receive");
+        show_raw();
+        answer = true;
       }
     }
   }
-  return false;
+  return answer;
 }
 
 void Jcode::convert() {
@@ -143,14 +144,15 @@ void Jcode::echo() {
         show_num();
         transmit(mode_num, 0, def_A + value2_num);
         transmit(mode_num, 1, def_B + value1_num);
+        Serial.println("convert");
       } else {       // データが無効なら関数離脱
         Serial.println("exit");
         return;
       }
+      //transmit(mode_num, 0, def_A + value2_num);
+      //transmit(mode_num, 1, def_B + value1_num);
     }
     check();
-    //transmit(mode_num, 0, def_A + value2_num);
-    //transmit(mode_num, 1, def_B + value1_num);
   }
 }
 /*=== class Jcode end ===*/
