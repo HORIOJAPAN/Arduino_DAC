@@ -19,9 +19,8 @@ int bck = 500;
 int rgt = 200;
 int lft = 3900;
 
-// Jcodeクラス 現在の値，待機している値
-Jcode Current;
-Jcode Queue;
+// Jcodeクラス
+Jcode JoystickData;
 
 void setup() {
   // 物理ボタンピン
@@ -100,19 +99,12 @@ void loop() {
   // その後，新しい指令値がない場合は停止
   // 割り込む場合は[mode == 0]で停止させてから新しいデータを送信する
   */
-  char str[40] = {0};
-  while (Serial.available() > 0) {
-    if (Serial.read() == 'j') {
-      if (Serial.readBytesUntil('x', str, 40) == 16) {
-        Current.set(str);
-        Current.show_raw();
-        Current.convert();
-        Current.echo();
-        // バッファがあるとき'j'が検出できるまで読み取り
-        // jの次から文字列の終端かxの直前までが16字の場合のみ動作
-      }
-    }
-  }
+  while (JoystickData.check() == true){
+    JoystickData.show_raw();
+    JoystickData.convert();
+    JoystickData.show_num();
+    JoystickData.echo();
+  };
 
   // シリアル通信がないとき，物理ボタンの状態を参照
   if (digitalRead(3) != digitalRead(6)) {
@@ -127,83 +119,6 @@ void loop() {
   } else {
     transmit(2, 1, def_B);
   }
-}
-
-
-void convert(char *str) {
-  /*
-  // 取得した文字列の内，データ部分を数値に変換する
-  // 数値化した指令値をそのままSPIに指示する
-  // 待機継続時間は5桁なのでlong型
-  // j8012340678955555x
-  // j1143211987600000x
-  //
-  // j0000000000010000x
-  // j1010000100010000x
-  // j1110001100010000x
-  // j2020000000010000x
-  // j0000000000010000x
-  */
-  char mode[2];
-  char velo[5];
-  char cros[5];
-  char dely[6];
-
-  mode[0] = str[0];
-  mode[1] = '\0';
-
-  velo[0] = str[2];
-  velo[1] = str[3];
-  velo[2] = str[4];
-  velo[3] = str[5];
-  velo[4] = '\0';
-
-  cros[0] = str[7];
-  cros[1] = str[8];
-  cros[2] = str[9];
-  cros[3] = str[10];
-  cros[4] = '\0';
-
-  dely[0] = str[11];
-  dely[1] = str[12];
-  dely[2] = str[13];
-  dely[3] = str[14];
-  dely[4] = str[15];
-  dely[5] = '\0';
-
-  int mode_num;
-  int velo_num;
-  int cros_num;
-  long dely_num;
-
-  int velo_pm = 1;
-  int cros_pm = 1;
-
-  if (str[1] != '0') velo_pm = -1;
-  if (str[6] != '0') cros_pm = -1;
-
-  mode_num = atoi(mode);
-  velo_num = velo_pm * atoi(velo);
-  cros_num = cros_pm * atoi(cros);
-  dely_num = atol(dely);
-
-  Serial.println(str);
-  //  Serial.println(mode);
-  //  Serial.println(velo);
-  //  Serial.println(cros);
-  //  Serial.println(dely);
-  Serial.println(mode_num);
-  Serial.println(velo_num);
-  Serial.println(cros_num);
-  Serial.println(dely_num);
-
-  long escape_time = millis() + dely_num;
-
-  do {
-    transmit(mode_num, 0, def_A + cros_num);
-    transmit(mode_num, 1, def_B + velo_num);
-  } while ( (escape_time > millis() ) && (Serial.available() <= 0) ) ;
-  Serial.println("exit");
 }
 
 

@@ -12,158 +12,149 @@ extern int def_B;
 extern int tmp_A;
 extern int tmp_B;
 
-extern Jcode Current;
-extern Jcode Queue;
 
 /*=== class Jcode begin ===*/
 class Jcode {
-    char raw_code[40];
+    char receive_raw[40];
 
-    char mode[2];
-    char velo[5];
-    char cros[5];
-    char dely[6];
-
-    int velo_num;
-    int cros_num;
-    long dely_num;
     long escape_time;
 
-    int velo_pm = 1;
-    int cros_pm = 1;
+    char mode[2];
+    char value1[5];
+    char value2[5];
+    char value3[6];
+
+    int mode_num;
+    int value1_num;
+    int value2_num;
+    long value3_num;
+
+    //    int value1_pm = 1;
+    //    int value2_pm = 1;
 
   public:
-    int mode_num;    // 0の参照のためpublic
-    bool valid = false;    // queueが有効な場合true
+    int receive_mode;           // 待機のモードは外部参照可能
+    bool receive_valid = false; // 待機が有効な場合true
 
     Jcode() ;
 
-    void set(char raw[40]);
-
+    bool check();
     void convert();
-
     void show_raw();
+    void show_div();
     void show_num();
-
     void echo();
 };
 
 Jcode::Jcode() {
-  //set(raw);
+  ;
 }
 
-void Jcode::set(char raw[40]) {
-  for (int i = 0; i < 40; i++) {
-    if (raw[i]) break;
-    raw_code[i] = raw[i];
+bool Jcode::check() {
+  /*
+  // シリアルバッファのチェック，'j'の探索
+  // 受信データをstrに格納，16バイトであればreceive_rawに複写
+  // 受信データのmodeが'0'のとき即時停止
+  // それ以外の時receive_valid = true
+  // 受信データが有効な場合，関数としてtrueを返しSPIの送信処理に入る
+  */
+  while (Serial.available() > 0) {
+    if (Serial.read() == 'j') {
+      char str[40];
+      if (Serial.readBytesUntil('x', str, 40) == 16) {
+        for (int i = 0; i < 40; i++) {
+          receive_raw[i] = str[i];
+        }
+        receive_raw[16] = '\0';
+        
+        if (receive_raw[0] == '0') {
+          transmit(0, 0, 0);
+          Serial.print("stop");
+          return false;
+          // 待機データのmodeが0のとき即時停止して関数離脱
+        }
+        receive_valid = true;
+        return true;
+      }
+    }
   }
+  return false;
 }
 
 void Jcode::convert() {
-  mode[0] = raw_code[0];
+  mode[0] = receive_raw[0];
   mode[1] = '\0';
 
-  velo[0] = raw_code[2];
-  velo[1] = raw_code[3];
-  velo[2] = raw_code[4];
-  velo[3] = raw_code[5];
-  velo[4] = '\0';
+  value1[0] = receive_raw[2];
+  value1[1] = receive_raw[3];
+  value1[2] = receive_raw[4];
+  value1[3] = receive_raw[5];
+  value1[4] = '\0';
 
-  cros[0] = raw_code[7];
-  cros[1] = raw_code[8];
-  cros[2] = raw_code[9];
-  cros[3] = raw_code[10];
-  cros[4] = '\0';
+  value2[0] = receive_raw[7];
+  value2[1] = receive_raw[8];
+  value2[2] = receive_raw[9];
+  value2[3] = receive_raw[10];
+  value2[4] = '\0';
 
-  dely[0] = raw_code[11];
-  dely[1] = raw_code[12];
-  dely[2] = raw_code[13];
-  dely[3] = raw_code[14];
-  dely[4] = raw_code[15];
-  dely[5] = '\0';
-
-  if (raw_code[1] != '0') velo_pm = -1;
-  if (raw_code[6] != '0') cros_pm = -1;
+  value3[0] = receive_raw[11];
+  value3[1] = receive_raw[12];
+  value3[2] = receive_raw[13];
+  value3[3] = receive_raw[14];
+  value3[4] = receive_raw[15];
+  value3[5] = '\0';
 
   mode_num = atoi(mode);
-  velo_num = velo_pm * atoi(velo);
-  cros_num = cros_pm * atoi(cros);
-  dely_num = atol(dely);
+  // {A ? B : C} => Aが trueならB, falseならC （三項演算子）
+  value1_num = (receive_raw[1] == '0') ? atoi(value1) : -atoi(value1);
+  value2_num = (receive_raw[6] == '0') ? atoi(value2) : -atoi(value2);
+  value3_num = atol(value3);
+
+  receive_valid = false;
 }
 
 void Jcode::show_raw() {
-  Serial.println(raw_code);
+  Serial.println(receive_raw);
+}
+
+void Jcode::show_div() {
   Serial.println(mode);
-  Serial.println(velo);
-  Serial.println(cros);
-  Serial.println(dely);
+  Serial.println(value1);
+  Serial.println(value2);
+  Serial.println(value3);
 }
 
 void Jcode::show_num() {
   Serial.println(mode_num);
-  Serial.println(velo_num);
-  Serial.println(cros_num);
-  Serial.println(dely_num);
+  Serial.println(value1_num);
+  Serial.println(value2_num);
+  Serial.println(value3_num);
 }
 
-extern char str;
-
 void Jcode::echo() {
-  escape_time = millis() + dely_num;
-  transmit(mode_num, 0, def_A + cros_num);
-  transmit(mode_num, 1, def_B + velo_num);
+  escape_time = millis() + value3_num;
+  transmit(mode_num, 0, def_A + value2_num);
+  transmit(mode_num, 1, def_B + value1_num);
   while (1) {
     if (escape_time <= millis()) { // 維持時間を超過した
-      if (Queue.valid == true) { // 待機データが有効である
-        // Queue を Current に代入
-        // Queue をクリア
-      } else {
-        return 0;
+      if (receive_valid == true) { // 待機データが有効である
+        show_raw();
+        convert();   // 待機データを数値に変換，データの無効化
+        show_num();
+        transmit(mode_num, 0, def_A + value2_num);
+        transmit(mode_num, 1, def_B + value1_num);
+      } else {       // データが無効なら関数離脱
+        Serial.println("exit");
+        return;
       }
     }
-    while (Serial.available() > 0) {
-      if (Serial.read() == 'j') {
-        if (Serial.readBytesUntil('x', str, 40) == 16) {
-          Queue.set(str);
-          Queue.convert();
-          if (Queue.mode_num == 0) {
-            transmit(0, 0, 0);
-            // Current,Queueクリア
-            return 0;
-          }
-          Queue.valid = true;
-        }
-      }
-    }
-    transmit(mode_num, 0, def_A + cros_num);
-    transmit(mode_num, 1, def_B + velo_num);
+    check();
+    //transmit(mode_num, 0, def_A + value2_num);
+    //transmit(mode_num, 1, def_B + value1_num);
   }
-  Serial.println("exit");
 }
 /*=== class Jcode end ===*/
 
-
-
-void spi_transmit(int ch, int tmp) {
-  SPI.begin() ;
-  if (ch == 0) {
-    digitalWrite(LDAC, HIGH) ;
-    digitalWrite(SS, LOW) ;
-    SPI.transfer(0b01110000 | (0b00001111 & highByte(tmp)));
-    SPI.transfer(lowByte(tmp));
-    digitalWrite(SS, HIGH) ;
-    digitalWrite(LDAC, LOW) ;       // ラッチ信号を出す
-  } else if (ch == 1) {
-    digitalWrite(LDAC, HIGH) ;
-    digitalWrite(SS, LOW) ;
-    SPI.transfer(0b11110000 | (0b00001111 & highByte(tmp)));
-    SPI.transfer(lowByte(tmp));
-    digitalWrite(SS, HIGH) ;
-    digitalWrite(LDAC, LOW) ;       // ラッチ信号を出す
-  }
-  SPI.end() ;
-  delay(5);
-}
 
 
 void transmit(int mode, int ch, int DA_value) {
@@ -258,3 +249,25 @@ void transmit(int mode, int ch, int DA_value) {
       break;
   }
 }
+
+void spi_transmit(int ch, int tmp) {
+  SPI.begin() ;
+  if (ch == 0) {
+    digitalWrite(LDAC, HIGH) ;
+    digitalWrite(SS, LOW) ;
+    SPI.transfer(0b01110000 | (0b00001111 & highByte(tmp)));
+    SPI.transfer(lowByte(tmp));
+    digitalWrite(SS, HIGH) ;
+    digitalWrite(LDAC, LOW) ;       // ラッチ信号を出す
+  } else if (ch == 1) {
+    digitalWrite(LDAC, HIGH) ;
+    digitalWrite(SS, LOW) ;
+    SPI.transfer(0b11110000 | (0b00001111 & highByte(tmp)));
+    SPI.transfer(lowByte(tmp));
+    digitalWrite(SS, HIGH) ;
+    digitalWrite(LDAC, LOW) ;       // ラッチ信号を出す
+  }
+  SPI.end() ;
+  delay(5);
+}
+
