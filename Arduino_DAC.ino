@@ -71,7 +71,7 @@ void setup() {
   SPI.setDataMode(SPI_MODE0) ;         // クロック極性０(LOW)　クロック位相０
 
   // 基準電圧の取得（入力は10bit，出力は12bit）
-  A0_val = 2;
+  A0_val = 0;
   A0_val += analogRead(A0);
   delay(1);
   A0_val += analogRead(A0);
