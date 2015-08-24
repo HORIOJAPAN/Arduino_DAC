@@ -5,6 +5,8 @@
 
 #define LDAC   12              // ラッチ動作出力ピン
 
+bool serial_report = true;
+
 #include "Arduino_DAC.h"
 
   /*
@@ -111,16 +113,16 @@ void loop() {
 
   // シリアル通信がないとき，物理ボタンの状態を参照
   if (digitalRead(3) != digitalRead(6)) {
-    if (digitalRead(3) == LOW)  transmit(2, 0, lft, 0);
-    if (digitalRead(6) == LOW)  transmit(2, 0, rgt, 0);
+    if (digitalRead(3) == LOW)  transmit(2, lft, no_order, 0);
+    if (digitalRead(6) == LOW)  transmit(2, rgt, no_order, 0);
   } else {
-    transmit(2, 0, def_A, 0);
+    transmit(2, def_A, no_order, 0);
   }
   if (digitalRead(4) != digitalRead(5)) {
-    if (digitalRead(4) == LOW)  transmit(2, 1, fwd, 0);
-    if (digitalRead(5) == LOW)  transmit(2, 1, bck, 0);
+    if (digitalRead(4) == LOW)  transmit(2, no_order, fwd, 0);
+    if (digitalRead(5) == LOW)  transmit(2, no_order, bck, 0);
   } else {
-    transmit(2, 1, def_B, 0);
+    transmit(2, no_order, def_B, 0);
   }
 }
 

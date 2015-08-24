@@ -4,7 +4,7 @@
 #include <SPI.h>
 #endif
 
-void transmit(int mode, int value1, int value2, int value3);
+void transmit(int mode, int order1, int order2, int order3);
 void spi_transmit(int ch, int tmp);
 
 extern int def_A;
@@ -12,6 +12,7 @@ extern int def_B;
 extern int tmp_A;
 extern int tmp_B;
 
+extern bool serial_report; // true:report  false:silent
 
 /*=== class Jcode begin ===*/
 class Jcode {
@@ -20,14 +21,14 @@ class Jcode {
     long escape_time;           // millis()と比較するための変数
 
     char mode[2];
-    char value1[5];
-    char value2[5];
-    char value3[6];             // 分割した文字列を格納
+    char data1[5];
+    char data2[5];
+    char data3[6];             // 分割した文字列を格納
 
     int mode_num;
-    int value1_num;
-    int value2_num;
-    long value3_num;            // 数値化して格納
+    int data1_num;
+    int data2_num;
+    long data3_num;            // 数値化して格納
 
   public:
     int receive_mode;           // 待機のモードは外部参照可能
@@ -86,96 +87,112 @@ void Jcode::convert() {
   mode[0] = receive_raw[0];
   mode[1] = '\0';
 
-  value1[0] = receive_raw[2];
-  value1[1] = receive_raw[3];
-  value1[2] = receive_raw[4];
-  value1[3] = receive_raw[5];
-  value1[4] = '\0';
+  data1[0] = receive_raw[2];
+  data1[1] = receive_raw[3];
+  data1[2] = receive_raw[4];
+  data1[3] = receive_raw[5];
+  data1[4] = '\0';
 
-  value2[0] = receive_raw[7];
-  value2[1] = receive_raw[8];
-  value2[2] = receive_raw[9];
-  value2[3] = receive_raw[10];
-  value2[4] = '\0';
+  data2[0] = receive_raw[7];
+  data2[1] = receive_raw[8];
+  data2[2] = receive_raw[9];
+  data2[3] = receive_raw[10];
+  data2[4] = '\0';
 
-  value3[0] = receive_raw[11];
-  value3[1] = receive_raw[12];
-  value3[2] = receive_raw[13];
-  value3[3] = receive_raw[14];
-  value3[4] = receive_raw[15];
-  value3[5] = '\0';
+  data3[0] = receive_raw[11];
+  data3[1] = receive_raw[12];
+  data3[2] = receive_raw[13];
+  data3[3] = receive_raw[14];
+  data3[4] = receive_raw[15];
+  data3[5] = '\0';
 
   mode_num = atoi(mode);
   // X = {A ? B : C} => Aが trueならB, falseならC （三項演算子）
-  value1_num = (receive_raw[1] == '0') ? atoi(value1) : -atoi(value1);
-  value2_num = (receive_raw[6] == '0') ? atoi(value2) : -atoi(value2);
-  value3_num = atol(value3);
+  data1_num = (receive_raw[1] == '0') ? atoi(data1) : -atoi(data1);
+  data2_num = (receive_raw[6] == '0') ? atoi(data2) : -atoi(data2);
+  data3_num = atol(data3);
 
   receive_valid = false;
 }
 
 void Jcode::show_raw() {
+  if (!serial_report) return;
   Serial.println(receive_raw);
 }
 
 void Jcode::show_div() {
+  if (!serial_report) return;
   Serial.println(mode);
-  Serial.println(value1);
-  Serial.println(value2);
-  Serial.println(value3);
+  Serial.println(data1);
+  Serial.println(data2);
+  Serial.println(data3);
 }
 
 void Jcode::show_num() {
+  if (!serial_report) return;
   Serial.println(mode_num);
-  Serial.println(value1_num);
-  Serial.println(value2_num);
-  Serial.println(value3_num);
+  Serial.println(data1_num);
+  Serial.println(data2_num);
+  Serial.println(data3_num);
 }
 
 void Jcode::echo() {
-  escape_time = millis() + value3_num;
-  transmit(mode_num, 0, def_A + value2_num, 0);
-  transmit(mode_num, 1, def_B + value1_num, 0);
+  escape_time = millis() + data3_num;
+  transmit(mode_num, def_A + data2_num, def_B + data1_num, 0);
+  // transmit(mode_num, 0, def_A + data2_num, 0);
+  // transmit(mode_num, 1, def_B + data1_num, 0);
   while (1) {
     if (escape_time <= millis()) { // 維持時間を超過した
       if (receive_valid == true) { // 待機データが有効である
-        convert();   // 待機データを数値に変換，データの無効化
+        convert();   // 待機データを数値に変換，待機データの無効化
         Serial.println("convert");
         show_num();
-        escape_time = millis() + value3_num;
-        transmit(mode_num, 0, def_A + value2_num, 0);
-        transmit(mode_num, 1, def_B + value1_num, 0);
+        escape_time = millis() + data3_num;
+        transmit(mode_num, def_A + data2_num, def_B + data1_num, 0);
+        // transmit(mode_num, 0, def_A + data2_num, 0);
+        // transmit(mode_num, 1, def_B + data1_num, 0);
       } else {       // データが無効なら関数離脱
         Serial.println("exit");
         return;
       }
-      //transmit(mode_num, 0, def_A + value2_num, 0);
-      //transmit(mode_num, 1, def_B + value1_num, 0);
-    }
+    } // 待機時間を超過しない場合checkだけを繰り返す
     check();
+    // transmit(mode_num, def_A + data2_num, def_B + data1_num, 0);
   }
 }
 /*=== class Jcode end ===*/
 
 
-　
+// ブランク値判定のための定数
+#define no_order -32768
 
+// スムーズ化の刻み幅（左右，前後）
+#define smt_pit_crs 30
+#define smt_pit_fwd 20
 
-void transmit(int mode, int value1, int value2, int value3) {
+void transmit(int mode, int order1, int order2, int order3) {
   /*
   // mode
-  // 0: 即時停止
-  // 1: スムージングなし
-  // 2: スムージングあり
-  // 3: ルンバ的動作（開発中）
-  // 4: 相対移動
+  // 0: (0, , , )即時停止
+  // 1: (1, ﾖｺ, ﾀﾃ, )スムージングなし
+  // 2: (2, ﾖｺ, ﾀﾃ, )スムージングあり
+  // 3: (3, vel, rad,)ルンバ的動作（開発中）
+  // 4: (4, dis, rad1, rad2)相対移動
   //
-  // ch(value1) 0:A(ヨコ) 1:B(タテ)
+  // // ch(order1) 0:A(ヨコ) 1:B(タテ)
+  // order1:0,A(ﾖｺ)  order2:1,B(ﾀﾃ)
+  // それぞれ定数no_orderのときブランク値として扱う
   // 基準値から±0.6Vは反応しないので，反応速度を高めるため
   // シリアル値で450だけ飛ばす
   // スムージングする場合，ヨコは30ずつ，タテは20ずつ加減算
   // tmp_A, tmp_Bはグローバル変数で現在のシリアル値を保持
   */
+
+
+  int velocity = order1;
+  int radius = order2;
+  int DA_vA = def_A;
+  int DA_vB = def_B;
 
   switch (mode) {
     case 0:
@@ -188,32 +205,49 @@ void transmit(int mode, int value1, int value2, int value3) {
 
     case 1:
       // スムージングなし
-      spi_transmit(value1, value2);
-      if (value1 == 0) tmp_A = value2;
-      if (value1 == 1) tmp_B = value2;
+      if (order1 != no_order) spi_transmit(0, tmp_A = order1);
+      if (order2 != no_order) spi_transmit(1, tmp_B = order2);
+      
+      //spi_transmit(order1, order2);
+      //if (order1 == 0) tmp_A = order2;
+      //if (order1 == 1) tmp_B = order2;
       break;
 
     case 2:
       // スムージングあり
-      if ((value1 == 0) && (tmp_A != value2)) {
+      // ヨコ(0,A)についてはorder1に直接アクセス
+      if ((order1 != no_order)&&(tmp_A != order1)){
+        if(tmp_A == def_A) tmp_A += (tmp_A < order1) ? 450 : -450;
+        if(abs(tmp_A - order1) < smt_pit_crs * 2) tmp_A += (tmp_A < order1) ? smt_pit_crs : -smt_pit_crs;
+        spi_transmit(0, tmp_A);
+        }
+      if ((order2 != no_order)&&(tmp_B != order2)){
+        if(tmp_B == def_B) tmp_B += (tmp_B < order2) ? 450 : -450;
+        if(abs(tmp_B - order2) < smt_pit_fwd * 2) tmp_B += (tmp_B < order2) ? smt_pit_fwd : -smt_pit_fwd;
+        spi_transmit(1, tmp_B);
+        }
+      
+      /*
+      if ((order1 == 0) && (tmp_A != order2)) {
         if (tmp_A == def_A) {
-          if (tmp_A < value2) tmp_A += 450;
-          else if (tmp_A > value2) tmp_A -= 450;
+          if (tmp_A < order2) tmp_A += 450;
+          else if (tmp_A > order2) tmp_A -= 450;
         }
-        if (abs(tmp_A - value2) < 60) tmp_A = value2;
-        else if (tmp_A < value2) tmp_A += 30;
-        else if (tmp_A > value2) tmp_A -= 30;
-      } else if ((value1 == 1) && (tmp_B != value2)) {
+        if (abs(tmp_A - order2) < 60) tmp_A = order2;
+        else if (tmp_A < order2) tmp_A += 30;
+        else if (tmp_A > order2) tmp_A -= 30;
+      } else if ((order1 == 1) && (tmp_B != order2)) {
         if (tmp_B == def_B) {
-          if (tmp_B < value2) tmp_B += 450;
-          else if (tmp_B > value2) tmp_B -= 450;
+          if (tmp_B < order2) tmp_B += 450;
+          else if (tmp_B > order2) tmp_B -= 450;
         }
-        if (abs(tmp_B - value2) < 40) tmp_B = value2;
-        else if (tmp_B < value2) tmp_B += 20;
-        else if (tmp_B > value2) tmp_B -= 20;
+        if (abs(tmp_B - order2) < 40) tmp_B = order2;
+        else if (tmp_B < order2) tmp_B += 20;
+        else if (tmp_B > order2) tmp_B -= 20;
       }
-      if (value1 == 0)  spi_transmit(0, tmp_A);
-      else if (value1 == 1)  spi_transmit(1, tmp_B);
+      if (order1 == 0)  spi_transmit(0, tmp_A);
+      else if (order1 == 1)  spi_transmit(1, tmp_B);
+      */
       break;
 
     case 3:
@@ -229,11 +263,6 @@ void transmit(int mode, int value1, int value2, int value3) {
       // 半径値が負のとき，右を回転中心として回転
       // 半径値が正のとき，左を回転中心として回転
       */
-
-      int velocity = value1;
-      int radius = value2;
-      int DA_vA = def_A;
-      int DA_vB = def_B;
 
       if (radius == 0) {
         DA_vB = def_B + velocity / 10 * 10;
@@ -268,7 +297,7 @@ void transmit(int mode, int value1, int value2, int value3) {
        * [5][00000][00000][00000]
        * [5][方位][距離][方位]
       // 現在地と目的地でのその場回転，直進により移動を実現する
-      // 
+      //
       // 現在地から目的地までの相対値で指令する
       // 目的地の相対方位
       // 目的地までの距離
@@ -290,7 +319,7 @@ void transmit(int mode, int value1, int value2, int value3) {
        *
       */;
       break;
-      
+
     case 6:
       /*
        * 直線移動，途中でのその場回転によって実現する
@@ -300,7 +329,7 @@ void transmit(int mode, int value1, int value2, int value3) {
        * 2つの角度の正負が異なる場合，case5を再帰呼び出しする
       */;
       break;
-      
+
     case 7:
       /*
        * 直線移動，円弧移動によって実現する
@@ -310,7 +339,7 @@ void transmit(int mode, int value1, int value2, int value3) {
        * 2つの角度の正負が異なる場合，case5を再帰呼び出しする
       */;
       break;
-      
+
     case 8:
       /*
        * 2つの円弧移動と直線移動によって実現する
@@ -321,7 +350,7 @@ void transmit(int mode, int value1, int value2, int value3) {
       */;
       break;
 
-      
+
   }
 }
 
