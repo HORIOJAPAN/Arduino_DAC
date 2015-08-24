@@ -55,6 +55,7 @@ bool Jcode::check() {
   // 受信データのmodeが'0'のとき即時停止
   // それ以外の時receive_valid = true
   // 受信データが有効な場合，関数としてtrueを返しSPIの送信処理に入る
+  // 即時停止（escape_time初期化，ループ脱出）のときSPIの送信処理をしてからfalseを戻す
   */
   bool answer = false;
   while (Serial.available() > 0) {
@@ -70,8 +71,9 @@ bool Jcode::check() {
           transmit(0, 0, 0, 0);
           Serial.println("stop");
           escape_time = 0;
-          return false;
-          // 待機データのmodeが0のとき即時停止して関数離脱
+          data3_num = 0;
+          receive_valid = false;
+          return false; // 待機データのmodeが0のとき即時停止して関数離脱
         }
         receive_valid = true;
         Serial.println("receive");
@@ -138,26 +140,26 @@ void Jcode::show_num() {
 
 void Jcode::echo() {
   escape_time = millis() + data3_num;
-  transmit(mode_num, def_A + data2_num, def_B + data1_num, 0);
+  transmit(mode_num, (def_A + data2_num), (def_B + data1_num), 0);
   // transmit(mode_num, 0, def_A + data2_num, 0);
   // transmit(mode_num, 1, def_B + data1_num, 0);
   while (1) {
-    if (escape_time <= millis()) { // 維持時間を超過した
+    if (escape_time >= millis()) { // 維持時間を超過しない
+      check();
+    } else { // 維持時間を超過した
       if (receive_valid == true) { // 待機データが有効である
         convert();   // 待機データを数値に変換，待機データの無効化
         Serial.println("convert");
         show_num();
         escape_time = millis() + data3_num;
-        transmit(mode_num, def_A + data2_num, def_B + data1_num, 0);
+        transmit(mode_num, (def_A + data2_num), (def_B + data1_num), 0);
         // transmit(mode_num, 0, def_A + data2_num, 0);
         // transmit(mode_num, 1, def_B + data1_num, 0);
-      } else {       // データが無効なら関数離脱
+      } else {       // 待機データが無効なら関数離脱
         Serial.println("exit");
         return;
       }
-    } // 待機時間を超過しない場合checkだけを繰り返す
-    check();
-    // transmit(mode_num, def_A + data2_num, def_B + data1_num, 0);
+    }
   }
 }
 /*=== class Jcode end ===*/
@@ -174,18 +176,19 @@ void transmit(int mode, int order1, int order2, int order3) {
   /*
   // mode
   // 0: (0, , , )即時停止
-  // 1: (1, ﾖｺ, ﾀﾃ, )スムージングなし
-  // 2: (2, ﾖｺ, ﾀﾃ, )スムージングあり
-  // 3: (3, vel, rad,)ルンバ的動作（開発中）
-  // 4: (4, dis, rad1, rad2)相対移動
+  // 1: (1, ﾖｺA, ﾀﾃB, )スムージングなし
+  // 2: (2, ﾖｺA, ﾀﾃB, )スムージングあり
+  // 3: (3, vel, rad, )ルンバ的動作（開発中）
+  // 4: (4, dis, rad, )
+  // 5: (5, dis, phi1, phi2)
+  // 8: (...)
   //
-  // // ch(order1) 0:A(ヨコ) 1:B(タテ)
-  // order1:0,A(ﾖｺ)  order2:1,B(ﾀﾃ)
-  // それぞれ定数no_orderのときブランク値として扱う
-  // 基準値から±0.6Vは反応しないので，反応速度を高めるため
-  // シリアル値で450だけ飛ばす
+  // ﾖｺ，ﾀﾃがno_orderのときブランク値として扱う
+  // 基準値から±0.6Vは反応しないので，反応速度を高めるため，シリアル値で450飛ばす
   // スムージングする場合，ヨコは30ずつ，タテは20ずつ加減算
-  // tmp_A, tmp_Bはグローバル変数で現在のシリアル値を保持
+  // tmp_A, tmp_Bはグローバル変数で現在のシリアル値を保持（スムージング専用）
+  // radは進行方向左の回転中心からの距離
+  // phi2はphi1からの相対値（？）
   */
 
 
@@ -207,7 +210,7 @@ void transmit(int mode, int order1, int order2, int order3) {
       // スムージングなし
       if (order1 != no_order) spi_transmit(0, tmp_A = order1);
       if (order2 != no_order) spi_transmit(1, tmp_B = order2);
-      
+
       //spi_transmit(order1, order2);
       //if (order1 == 0) tmp_A = order2;
       //if (order1 == 1) tmp_B = order2;
@@ -215,18 +218,17 @@ void transmit(int mode, int order1, int order2, int order3) {
 
     case 2:
       // スムージングあり
-      // ヨコ(0,A)についてはorder1に直接アクセス
-      if ((order1 != no_order)&&(tmp_A != order1)){
-        if(tmp_A == def_A) tmp_A += (tmp_A < order1) ? 450 : -450;
-        if(abs(tmp_A - order1) < smt_pit_crs * 2) tmp_A += (tmp_A < order1) ? smt_pit_crs : -smt_pit_crs;
+      if ((order1 != no_order) && (tmp_A != order1)) {
+        if (tmp_A == def_A) tmp_A += (tmp_A < order1) ? 450 : -450;
+        if (abs(tmp_A - order1) < smt_pit_crs * 2) tmp_A += (tmp_A < order1) ? smt_pit_crs : -smt_pit_crs;
         spi_transmit(0, tmp_A);
-        }
-      if ((order2 != no_order)&&(tmp_B != order2)){
-        if(tmp_B == def_B) tmp_B += (tmp_B < order2) ? 450 : -450;
-        if(abs(tmp_B - order2) < smt_pit_fwd * 2) tmp_B += (tmp_B < order2) ? smt_pit_fwd : -smt_pit_fwd;
+      }
+      if ((order2 != no_order) && (tmp_B != order2)) {
+        if (tmp_B == def_B) tmp_B += (tmp_B < order2) ? 450 : -450;
+        if (abs(tmp_B - order2) < smt_pit_fwd * 2) tmp_B += (tmp_B < order2) ? smt_pit_fwd : -smt_pit_fwd;
         spi_transmit(1, tmp_B);
-        }
-      
+      }
+
       /*
       if ((order1 == 0) && (tmp_A != order2)) {
         if (tmp_A == def_A) {

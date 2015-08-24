@@ -5,7 +5,7 @@
 
 #define LDAC   12              // ラッチ動作出力ピン
 
-bool serial_report = true;
+bool serial_report = true; // デバッグ用のフラッグ（受信値のシリアル報告）
 
 #include "Arduino_DAC.h"
 
@@ -90,8 +90,7 @@ void setup() {
   lft = def_A + 1500;
 
   // スムージングなしでデフォルト値の出力
-  transmit(1, 0, def_A, 0);
-  transmit(1, 1, def_B, 0);
+  transmit(1, def_A, def_B, 0);
 
   // シリアル通信のタイムアウトを5msに（デフォルトは1000ms）
   Serial.begin(9600);
