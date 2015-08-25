@@ -82,8 +82,9 @@ void setup() {
   delay(1);
   A0_val += analogRead(A0);
 
-  // 出力目標値の設定
   def_A = def_B = A0_val;
+  
+  // 物理ボタンの出力目標値の設定
   fwd = def_B + 1300;
   bck = def_B - 1500;
   rgt = def_A - 1500;
@@ -95,15 +96,12 @@ void setup() {
   // シリアル通信のタイムアウトを5msに（デフォルトは1000ms）
   Serial.begin(9600);
   Serial.setTimeout(5);
-  Serial.println("start_DAC");
+  Serial.println("J_start_DAC");
 }
 
 
 void loop() {
   while (JoystickData.check() == true){
-    JoystickData.show_raw();
-    JoystickData.convert();
-    JoystickData.show_num();
     JoystickData.echo();
   }
 

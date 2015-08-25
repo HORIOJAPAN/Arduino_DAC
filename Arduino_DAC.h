@@ -34,8 +34,9 @@ class Jcode {
     int receive_mode;           // 待機のモードは外部参照可能
     bool receive_valid = false; // 待機が有効な場合true
 
-    Jcode() ;
+    Jcode();
 
+    void reset_dac();
     bool check();       // シリアルバッファのチェック，文字列格納，即時停止チェック
     void convert();     // 格納された文字列の数値化
     void show_raw();
@@ -46,6 +47,13 @@ class Jcode {
 
 Jcode::Jcode() {
   ;
+}
+
+void Jcode::reset_dac() {
+  transmit(0, 0, 0, 0);
+  Serial.println("J_stop");
+  escape_time = data3_num = 0;
+  receive_valid = false;
 }
 
 bool Jcode::check() {
@@ -68,16 +76,13 @@ bool Jcode::check() {
         receive_raw[16] = '\0';
 
         if (receive_raw[0] == '0') {
-          transmit(0, 0, 0, 0);
-          Serial.println("stop");
-          escape_time = 0;
-          data3_num = 0;
-          receive_valid = false;
+          reset_dac();
           return false; // 待機データのmodeが0のとき即時停止して関数離脱
         }
-        receive_valid = true;
-        Serial.println("receive");
+
+        Serial.println("J_receive");
         show_raw();
+        receive_valid = true;
         answer = true;
       }
     }
@@ -113,6 +118,7 @@ void Jcode::convert() {
   data1_num = (receive_raw[1] == '0') ? atoi(data1) : -atoi(data1);
   data2_num = (receive_raw[6] == '0') ? atoi(data2) : -atoi(data2);
   data3_num = atol(data3);
+  // data3にマイナス値を許容するか？
 
   receive_valid = false;
 }
@@ -139,24 +145,25 @@ void Jcode::show_num() {
 }
 
 void Jcode::echo() {
+  convert();
+  Serial.println("J_convert");
+  show_num();
+
   escape_time = millis() + data3_num;
   transmit(mode_num, (def_A + data2_num), (def_B + data1_num), 0);
-  // transmit(mode_num, 0, def_A + data2_num, 0);
-  // transmit(mode_num, 1, def_B + data1_num, 0);
   while (1) {
     if (escape_time >= millis()) { // 維持時間を超過しない
       check();
     } else { // 維持時間を超過した
       if (receive_valid == true) { // 待機データが有効である
         convert();   // 待機データを数値に変換，待機データの無効化
-        Serial.println("convert");
+        Serial.println("J_convert");
         show_num();
         escape_time = millis() + data3_num;
         transmit(mode_num, (def_A + data2_num), (def_B + data1_num), 0);
-        // transmit(mode_num, 0, def_A + data2_num, 0);
-        // transmit(mode_num, 1, def_B + data1_num, 0);
-      } else {       // 待機データが無効なら関数離脱
-        Serial.println("exit");
+      } else {       // 待機データが無効なら初期化して関数離脱
+        reset_dac();
+        Serial.println("J_exit");
         return;
       }
     }
@@ -179,8 +186,8 @@ void transmit(int mode, int order1, int order2, int order3) {
   // 1: (1, ﾖｺA, ﾀﾃB, )スムージングなし
   // 2: (2, ﾖｺA, ﾀﾃB, )スムージングあり
   // 3: (3, vel, rad, )ルンバ的動作（開発中）
-  // 4: (4, dis, rad, )
-  // 5: (5, dis, phi1, phi2)
+  // 4: (4,    , rad, dist)
+  // 5: (5, phi1, phi2, dist)
   // 8: (...)
   //
   // ﾖｺ，ﾀﾃがno_orderのときブランク値として扱う
@@ -189,6 +196,7 @@ void transmit(int mode, int order1, int order2, int order3) {
   // tmp_A, tmp_Bはグローバル変数で現在のシリアル値を保持（スムージング専用）
   // radは進行方向左の回転中心からの距離
   // phi2はphi1からの相対値（？）
+  // 各distは+-32767[mm]まで対応しているが，30[m]を越えて入力しない
   */
 
 
@@ -200,10 +208,8 @@ void transmit(int mode, int order1, int order2, int order3) {
   switch (mode) {
     case 0:
       // 即時停止
-      spi_transmit(0, def_A);
-      spi_transmit(1, def_B);
-      tmp_A = def_A;
-      tmp_B = def_B;
+      spi_transmit(0, tmp_A = def_A);
+      spi_transmit(1, tmp_B = def_B);
       break;
 
     case 1:
