@@ -218,14 +218,16 @@ void transmit(int mode, int order1, int order2, int order3) {
 
     case 2:
       // スムージングあり
-      if ((order1 != no_order) && (tmp_A != order1)) {
+      if ((order1 != no_order) && (order1 != tmp_A)) {
         if (tmp_A == def_A) tmp_A += (tmp_A < order1) ? 450 : -450;
-        if (abs(tmp_A - order1) < smt_pit_crs * 2) tmp_A += (tmp_A < order1) ? smt_pit_crs : -smt_pit_crs;
+        if (abs(tmp_A - order1) < smt_pit_crs * 2) tmp_A = order1;
+        tmp_A += (tmp_A < order1) ? smt_pit_crs : -smt_pit_crs;
         spi_transmit(0, tmp_A);
       }
-      if ((order2 != no_order) && (tmp_B != order2)) {
+      if ((order2 != no_order) && (order2 != tmp_B)) {
         if (tmp_B == def_B) tmp_B += (tmp_B < order2) ? 450 : -450;
-        if (abs(tmp_B - order2) < smt_pit_fwd * 2) tmp_B += (tmp_B < order2) ? smt_pit_fwd : -smt_pit_fwd;
+        if (abs(tmp_B - order2) < smt_pit_fwd * 2) tmp_B = order2;
+        tmp_B += (tmp_B < order2) ? smt_pit_fwd : -smt_pit_fwd;
         spi_transmit(1, tmp_B);
       }
 
