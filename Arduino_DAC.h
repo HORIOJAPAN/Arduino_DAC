@@ -23,12 +23,16 @@ class Jcode {
     char mode[2];
     char data1[5];
     char data2[5];
-    char data3[6];             // 分割した文字列を格納
+    char data3[5];             // 分割した文字列を格納
 
     int mode_num;
     int data1_num;
     int data2_num;
     long data3_num;            // 数値化して格納
+
+    long sqec_coordinate[5][3];// 経路の座標表示
+    long sqec_command[5][3];   // 指令値表示
+    long sqec_escape_time[5];  // 切り換え時刻（終了時刻表示）
 
   public:
     int receive_mode;           // 待機のモードは外部参照可能
@@ -43,6 +47,7 @@ class Jcode {
     void show_div();
     void show_num();    // データのシリアル送信
     void echo();        // 維持時間の間，繰り返し処理
+    void sqec_echo();   // 指定された座標まで連続処理
 };
 
 Jcode::Jcode() {
@@ -50,6 +55,10 @@ Jcode::Jcode() {
 }
 
 void Jcode::reset_dac() {
+  /*
+   * 電圧，継続時刻，待機データフラグの初期化
+   * 継続処理ループ内でも離脱できる
+  */
   transmit(0, 0, 0, 0);
   Serial.println("J_stop");
   escape_time = data3_num = 0;
@@ -106,19 +115,17 @@ void Jcode::convert() {
   data2[3] = receive_raw[10];
   data2[4] = '\0';
 
-  data3[0] = receive_raw[11];
-  data3[1] = receive_raw[12];
-  data3[2] = receive_raw[13];
-  data3[3] = receive_raw[14];
-  data3[4] = receive_raw[15];
-  data3[5] = '\0';
+  data3[0] = receive_raw[12];
+  data3[1] = receive_raw[13];
+  data3[2] = receive_raw[14];
+  data3[3] = receive_raw[15];
+  data3[4] = '\0';
 
   mode_num = atoi(mode);
   // X = {A ? B : C} => Aが trueならB, falseならC （三項演算子）
   data1_num = (receive_raw[1] == '0') ? atoi(data1) : -atoi(data1);
   data2_num = (receive_raw[6] == '0') ? atoi(data2) : -atoi(data2);
-  data3_num = atol(data3);
-  // data3にマイナス値を許容するか？
+  data3_num = (receive_raw[11] == '0') ? atoi(data3) : -atoi(data3);
 
   receive_valid = false;
 }
@@ -148,9 +155,10 @@ void Jcode::echo() {
   convert();
   Serial.println("J_convert");
   show_num();
+  // modeによって分岐が必要（data3がdelayとは限らないなど
 
   escape_time = millis() + data3_num;
-  transmit(mode_num, (def_A + data2_num), (def_B + data1_num), 0);
+  transmit(mode_num, data1_num, data2_num, data3_num);
   while (1) {
     if (escape_time >= millis()) { // 維持時間を超過しない
       check();
@@ -160,7 +168,7 @@ void Jcode::echo() {
         Serial.println("J_convert");
         show_num();
         escape_time = millis() + data3_num;
-        transmit(mode_num, (def_A + data2_num), (def_B + data1_num), 0);
+        transmit(mode_num, data1_num, data2_num, data3_num);
       } else {       // 待機データが無効なら初期化して関数離脱
         reset_dac();
         Serial.println("J_exit");
@@ -168,6 +176,28 @@ void Jcode::echo() {
       }
     }
   }
+}
+
+void Jcode::sqec_echo() {
+  /*
+   * 目的地の座標を目指して連続処理する
+   * echoを汎用化させる方がいい気もする
+   * escape_timeの判定を多重化させればおｋ？
+   * 
+   * 5: (5, phi1, phi2, dist)
+  */
+  
+  //sqec_coordinate[5][3];// 経路の座標表示
+  //sqec_command[5][3];   // 指令値表示
+  //sqec_escape_time[5];  // 切り換え時刻（終了時刻表示）
+
+  /*
+   * ローカル変数で接線の交点の座標や回転中心の座標を計算
+   * それを元にして指令値の計算
+   * 各指令値に対して要する時間を計算し，継続時間を計算
+   * 自己位置の正確な推定のため，シーケンス終わりに直線移動？
+   * 
+  */
 }
 /*=== class Jcode end ===*/
 
@@ -183,8 +213,8 @@ void transmit(int mode, int order1, int order2, int order3) {
   /*
   // mode
   // 0: (0, , , )即時停止
-  // 1: (1, ﾖｺA, ﾀﾃB, )スムージングなし
-  // 2: (2, ﾖｺA, ﾀﾃB, )スムージングあり
+  // 1: (1, ﾖｺA0, ﾀﾃB1, )スムージングなし
+  // 2: (2, ﾖｺA0, ﾀﾃB1, )スムージングあり
   // 3: (3, vel, rad, )ルンバ的動作（開発中）
   // 4: (4,    , rad, dist)
   // 5: (5, phi1, phi2, dist)
@@ -214,50 +244,30 @@ void transmit(int mode, int order1, int order2, int order3) {
 
     case 1:
       // スムージングなし
-      if (order1 != no_order) spi_transmit(0, tmp_A = order1);
-      if (order2 != no_order) spi_transmit(1, tmp_B = order2);
-
-      //spi_transmit(order1, order2);
-      //if (order1 == 0) tmp_A = order2;
-      //if (order1 == 1) tmp_B = order2;
+      int value1 = def_A + order1; // SPI通信の絶対値に変換
+      int value2 = def_B + order2; // order1,2はブランク値の確認にのみ使用
+      
+      if (order1 != no_order) spi_transmit(0, tmp_A = value1);
+      if (order2 != no_order) spi_transmit(1, tmp_B = value2);
       break;
 
     case 2:
       // スムージングあり
-      if ((order1 != no_order) && (order1 != tmp_A)) {
-        if (tmp_A == def_A) tmp_A += (tmp_A < order1) ? 450 : -450;
-        if (abs(tmp_A - order1) < smt_pit_crs * 2) tmp_A = order1;
-        tmp_A += (tmp_A < order1) ? smt_pit_crs : -smt_pit_crs;
+      int value1 = def_A + order1; // SPI通信の絶対値に変換
+      int value2 = def_B + order2; // order1,2はブランク値の確認にのみ使用
+      
+      if ((order1 != no_order) && (value1 != tmp_A)) {
+        if (tmp_A == def_A) tmp_A += (tmp_A < value1) ? 450 : -450;
+        if (abs(tmp_A - value1) < smt_pit_crs * 2) tmp_A = value1;
+        tmp_A += (tmp_A < value1) ? smt_pit_crs : -smt_pit_crs;
         spi_transmit(0, tmp_A);
       }
-      if ((order2 != no_order) && (order2 != tmp_B)) {
-        if (tmp_B == def_B) tmp_B += (tmp_B < order2) ? 450 : -450;
-        if (abs(tmp_B - order2) < smt_pit_fwd * 2) tmp_B = order2;
-        tmp_B += (tmp_B < order2) ? smt_pit_fwd : -smt_pit_fwd;
+      if ((order2 != no_order) && (value2 != tmp_B)) {
+        if (tmp_B == def_B) tmp_B += (tmp_B < value2) ? 450 : -450;
+        if (abs(tmp_B - value2) < smt_pit_fwd * 2) tmp_B = value2;
+        tmp_B += (tmp_B < value2) ? smt_pit_fwd : -smt_pit_fwd;
         spi_transmit(1, tmp_B);
       }
-
-      /*
-      if ((order1 == 0) && (tmp_A != order2)) {
-        if (tmp_A == def_A) {
-          if (tmp_A < order2) tmp_A += 450;
-          else if (tmp_A > order2) tmp_A -= 450;
-        }
-        if (abs(tmp_A - order2) < 60) tmp_A = order2;
-        else if (tmp_A < order2) tmp_A += 30;
-        else if (tmp_A > order2) tmp_A -= 30;
-      } else if ((order1 == 1) && (tmp_B != order2)) {
-        if (tmp_B == def_B) {
-          if (tmp_B < order2) tmp_B += 450;
-          else if (tmp_B > order2) tmp_B -= 450;
-        }
-        if (abs(tmp_B - order2) < 40) tmp_B = order2;
-        else if (tmp_B < order2) tmp_B += 20;
-        else if (tmp_B > order2) tmp_B -= 20;
-      }
-      if (order1 == 0)  spi_transmit(0, tmp_A);
-      else if (order1 == 1)  spi_transmit(1, tmp_B);
-      */
       break;
 
     case 3:
