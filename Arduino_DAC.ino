@@ -84,8 +84,8 @@ void setup() {
 
   // 出力目標値の設定
   def_A = def_B = A0_val;
-  fwd = def_B + 1300;
-  bck = def_B - 1500;
+  fwd = def_B - 2000;
+  bck = def_B + 2000;
   rgt = def_A - 1500;
   lft = def_A + 1500;
 
