@@ -84,8 +84,8 @@ void setup() {
 
   // 出力目標値の設定
   def_A = def_B = A0_val;
-  fwd = def_B - 2000;
-  bck = def_B + 2000;
+  fwd = def_B - 1500;
+  bck = def_B + 1500;
   rgt = def_A - 1500;
   lft = def_A + 1500;
 
@@ -115,13 +115,15 @@ void loop() {
     if (digitalRead(3) == LOW)  transmit(2, lft, no_order, 0);
     if (digitalRead(6) == LOW)  transmit(2, rgt, no_order, 0);
   } else {
-    transmit(2, def_A, no_order, 0);
+    //transmit(2, def_A, no_order, 0);
+    transmit(1, def_A, no_order, 0);
   }
   if (digitalRead(4) != digitalRead(5)) {
     if (digitalRead(4) == LOW)  transmit(2, no_order, fwd, 0);
     if (digitalRead(5) == LOW)  transmit(2, no_order, bck, 0);
   } else {
-    transmit(2, no_order, def_B, 0);
+    //transmit(2, no_order, def_B, 0);
+    transmit(1, no_order, def_B, 0);
   }
 }
 
