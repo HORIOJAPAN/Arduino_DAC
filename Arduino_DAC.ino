@@ -81,11 +81,81 @@ void setup() {
   A0_val += analogRead(A0);
   delay(1);
   A0_val += analogRead(A0);
+  
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  
+  
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+  delay(1);
+  A0_val += analogRead(A0);
+
+// 0 - 32736
+
+  A0_val /= 8;
+
+// 0 - 4092
 
   // 出力目標値の設定
   def_A = def_B = A0_val;
   fwd = def_B - 1500;
-  bck = def_B + 1500;
+  bck = def_B + 1600;
   rgt = def_A - 1500;
   lft = def_A + 1500;
 
