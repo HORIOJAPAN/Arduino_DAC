@@ -115,10 +115,11 @@ void Jcode::convert() {
   data3_num = atol(data3);
 
   receive_valid = false;
+  Serial.println("convert");
 }
 
 void Jcode::show_raw() {
-  if (!serial_report) return;
+  //if (!serial_report) return;
   Serial.println(receive_raw);
 }
 
@@ -149,7 +150,7 @@ void Jcode::echo() {
     } else { // 維持時間を超過した
       if (receive_valid == true) { // 待機データが有効である
         convert();   // 待機データを数値に変換，待機データの無効化
-        Serial.println("convert");
+        // Serial.println("convert");
         show_num();
         escape_time = millis() + data3_num;
         transmit(mode_num, (def_A + data2_num), (def_B + data1_num), 0);
@@ -267,7 +268,7 @@ void transmit(int mode, int order1, int order2, int order3) {
       // 半径値が負のとき，右を回転中心として回転
       // 半径値が正のとき，左を回転中心として回転
       */
-
+      /*
       if (radius == 0) {
         DA_vB = def_B + velocity / 10 * 10;
         spi_transmit(0, def_A);
@@ -285,6 +286,7 @@ void transmit(int mode, int order1, int order2, int order3) {
       } else { // 速度
         while (0);
       }
+      */
       break;
 
     case 4:
