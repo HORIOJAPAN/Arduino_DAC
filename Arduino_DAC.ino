@@ -112,7 +112,8 @@ void setup() {
   // シリアル通信のタイムアウトを5msに（デフォルトは1000ms）
   Serial.begin(9600);
   Serial.setTimeout(5);
-  Serial.println("start_DAC");
+  Serial.print("start_DAC ");
+  Serial.println(A0_val);
 }
 
 
